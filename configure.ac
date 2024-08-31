@@ -1167,9 +1167,11 @@ AC_CONFIG_FILES([Makefile
                  test/benchmark/Makefile
                  test/leakcheck/Makefile
                  test/util/Makefile
+                 test/reduction/Makefile
                  examples/Makefile
                  examples/fibonacci/Makefile
                  examples/hello_world/Makefile
+                 examples/reduction_sum/Makefile
                  examples/profiling/Makefile
                  examples/scheduling/Makefile
                  examples/stencil/Makefile])
