@@ -15,6 +15,7 @@
 #include <stdarg.h>
 #include <abt.h>
 #include <string.h>
+#include <limits.h>
 
 #define DEFAULT_NUM_XSTREAMS 2
 #define DEFAULT_NUM_THREADS 8
@@ -31,7 +32,6 @@ typedef struct {
     int num_threads;
 } reduction_context_t;
 
-
 typedef struct {
     void *array;                         /* array, on which reduction will be performed */
     size_t num_elems;                    /* number of elements to perform reduction on */
@@ -41,7 +41,6 @@ typedef struct {
     void (*reduce_func)(void *, void *); /* provided reduction function on 2 elements */
     ABT_mutex mutex;                     /* mutex to perform final (among different threads) reduction */
 } reduction_args_t;
-
 
 void reduction_thread(void *arg) {
     reduction_args_t *reduction_args = (reduction_args_t *)arg;
@@ -63,7 +62,6 @@ void reduction_thread(void *arg) {
 
     free(local_result);
 }
-
 
 void reduce_common(
     reduction_context_t *reduction_context,
@@ -111,10 +109,286 @@ void reduce_common(
     free(thread_args);
 }
 
-void sum_reduction_func(void *a, void *b) {
+/* functions for SUM (+) reduction */
+void reduce_sum_int_func(void *a, void *b) {
     *((int *)a) += *((int *)b);
 }
 
+void reduce_sum_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = 0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_sum_int_func, result);
+}
+
+void reduce_sum_long_long_int_func(void *a, void *b) {
+    *((long long int *)a) += *((long long int *)b);
+}
+
+void reduce_sum_long_long_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    long long int default_reduction_value = 0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_sum_long_long_int_func, result);
+}
+
+void reduce_sum_float_func(void *a, void *b) {
+    *((float *)a) += *((float *)b);
+}
+
+void reduce_sum_float(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    float default_reduction_value = 0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_sum_float_func, result);
+}
+
+void reduce_sum_double_func(void *a, void *b) {
+    *((double *)a) += *((double *)b);
+}
+
+void reduce_sum_double(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    double default_reduction_value = 0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_sum_double_func, result);
+}
+
+
+/* functions for MULT (*) reduction */
+void reduce_mult_int_func(void *a, void *b) {
+    *((int *)a) *= *((int *)b);
+}
+
+void reduce_mult_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = 1;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_mult_int_func, result);
+}
+
+void reduce_mult_long_long_int_func(void *a, void *b) {
+    *((long long int *)a) *= *((long long int *)b);
+}
+
+void reduce_mult_long_long_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    long long int default_reduction_value = 1;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_mult_long_long_int_func, result);
+}
+
+void reduce_mult_float_func(void *a, void *b) {
+    *((float *)a) *= *((float *)b);
+}
+
+void reduce_mult_float(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    float default_reduction_value = 1;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_mult_float_func, result);
+}
+
+void reduce_mult_double_func(void *a, void *b) {
+    *((double *)a) *= *((double *)b);
+}
+
+void reduce_mult_double(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    double default_reduction_value = 1;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_mult_double_func, result);
+}
+
+/* functions for SUB (-) reduction */
+void reduce_sub_int_func(void *a, void *b) {
+    *((int *)a) -= *((int *)b);
+}
+
+void reduce_sub_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = 0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_sub_int_func, result);
+}
+
+/* functions for AND (&) reduction */
+void reduce_and_int_func(void *a, void *b) {
+    *((int *)a) &= *((int *)b);
+}
+
+void reduce_and_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = ~0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_and_int_func, result);
+}
+
+
+/* functions for OR (|) reduction */
+void reduce_or_int_func(void *a, void *b) {
+    *((int *)a) |= *((int *)b);
+}
+
+void reduce_or_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = 0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_or_int_func, result);
+}
+
+
+/* functions for XOR (^) reduction */
+void reduce_xor_int_func(void *a, void *b) {
+    *((int *)a) ^= *((int *)b);
+}
+
+void reduce_xor_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = 0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_xor_int_func, result);
+}
+
+
+/* functions for logical AND (&&) reduction */
+void reduce_logical_and_int_func(void *out, void *in) {
+    *((int *)out) = *((int *)in) && *((int *)out);
+}
+
+void reduce_logical_and_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = 1;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_logical_and_int_func, result);
+}
+
+
+/* functions for logical OR (||) reduction */
+void reduce_logical_or_int_func(void *out, void *in) {
+    *((int *)out) = *((int *)in) || *((int *)out);
+}
+
+void reduce_logical_or_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = 0;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_logical_or_int_func, result);
+}
+
+
+/* functions for MAX reduction */
+void reduce_max_int_func(void *out, void *in) {
+    int out_val = *((int *)out);
+    int in_val = *((int *)in);
+    *((int *)out) = in_val > out_val ? in_val : out_val;
+}
+
+void reduce_max_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = INT_MIN;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_max_int_func, result);
+}
+
+
+/* functions for MIN reduction */
+void reduce_min_int_func(void *out, void *in) {
+    int out_val = *((int *)out);
+    int in_val = *((int *)in);
+    *((int *)out) = in_val < out_val ? out_val : in_val;
+}
+
+void reduce_min_int(
+    reduction_context_t *reduction_context,
+    void *array,
+    size_t num_elems,
+    size_t elem_size,
+    void *result
+) {
+    int default_reduction_value = INT_MAX;
+    reduce_common(reduction_context, array, num_elems, elem_size,
+                  &default_reduction_value, reduce_min_int_func, result);
+}
+
+
+// TODO: all functions above should be moved to other files inside argobots
+// TODO: some of the functions don't have versions for different types yet
 int main(int argc, char **argv)
 {
     int i;
@@ -176,8 +450,6 @@ int main(int argc, char **argv)
       array[idx] = idx;
     }
 
-    int default_reduction_value = 0;
-    int result = 0;
     reduction_context_t reduction_context = {
         .xstreams = xstreams,
         .num_xstreams = num_xstreams,
@@ -186,14 +458,12 @@ int main(int argc, char **argv)
         .threads = threads,
         .num_threads = num_threads,
     };
-
-    reduce_common(
+    int result = 0;
+    reduce_sum_int(
         &reduction_context,
         array,
         NUM_ELEMS,
         elem_size,
-        &default_reduction_value,
-        sum_reduction_func,
         &result
     );
 
