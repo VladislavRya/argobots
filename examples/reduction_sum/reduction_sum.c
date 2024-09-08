@@ -6,7 +6,7 @@
 /*
  * Creates multiple execution streams and runs ULTs on these execution streams.
  * Users can change the number of execution streams and the number of ULT via
- * arguments. Each ULT prints its ID.
+ * arguments. Each ULT performs a reduction operation on a given array.
  */
 
 #include <stdio.h>
@@ -16,6 +16,7 @@
 #include <abt.h>
 #include <string.h>
 #include <limits.h>
+#include <float.h>
 
 #define DEFAULT_NUM_XSTREAMS 2
 #define DEFAULT_NUM_THREADS 8
@@ -23,6 +24,7 @@
 #define NUM_ELEMS 1024
 
 
+// Note: declarations below must be moved to main argobots headers, after code review is done
 typedef struct {
     ABT_xstream *xstreams;
     int num_xstreams;
@@ -31,6 +33,71 @@ typedef struct {
     ABT_thread *threads;
     int num_threads;
 } reduction_context_t;
+
+// =================== Declarations for reduction funcs ===================
+#define DECLARE_REDFUNC(func, type, type_str) \
+void reduce_##func##_##type_str(reduction_context_t *reduction_context, type *array, size_t num_elems, type *result)
+
+// Use in case when type and it's string representation are the same (for example, int, float)
+#define DECLARE_REDFUNC_SIMPLE(func, type) DECLARE_REDFUNC(func, type, type)
+
+DECLARE_REDFUNC_SIMPLE(sum, char);
+DECLARE_REDFUNC_SIMPLE(sub, char);
+DECLARE_REDFUNC_SIMPLE(prod, char);
+DECLARE_REDFUNC_SIMPLE(and, char);
+DECLARE_REDFUNC_SIMPLE(or, char);
+DECLARE_REDFUNC_SIMPLE(xor, char);
+DECLARE_REDFUNC_SIMPLE(logical_and, char);
+DECLARE_REDFUNC_SIMPLE(logical_or, char);
+DECLARE_REDFUNC_SIMPLE(max, char);
+DECLARE_REDFUNC_SIMPLE(min, char);
+
+DECLARE_REDFUNC_SIMPLE(sum, int);
+DECLARE_REDFUNC_SIMPLE(sub, int);
+DECLARE_REDFUNC_SIMPLE(prod, int);
+DECLARE_REDFUNC_SIMPLE(and, int);
+DECLARE_REDFUNC_SIMPLE(or, int);
+DECLARE_REDFUNC_SIMPLE(xor, int);
+DECLARE_REDFUNC_SIMPLE(logical_and, int);
+DECLARE_REDFUNC_SIMPLE(logical_or, int);
+DECLARE_REDFUNC_SIMPLE(max, int);
+DECLARE_REDFUNC_SIMPLE(min, int);
+
+DECLARE_REDFUNC_SIMPLE(sum, long);
+DECLARE_REDFUNC_SIMPLE(sub, long);
+DECLARE_REDFUNC_SIMPLE(prod, long);
+DECLARE_REDFUNC_SIMPLE(and, long);
+DECLARE_REDFUNC_SIMPLE(or, long);
+DECLARE_REDFUNC_SIMPLE(xor, long);
+DECLARE_REDFUNC_SIMPLE(logical_and, long);
+DECLARE_REDFUNC_SIMPLE(logical_or, long);
+DECLARE_REDFUNC_SIMPLE(max, long);
+DECLARE_REDFUNC_SIMPLE(min, long);
+
+DECLARE_REDFUNC(sum, long long, long_long);
+DECLARE_REDFUNC(sub, long long, long_long);
+DECLARE_REDFUNC(prod, long long, long_long);
+DECLARE_REDFUNC(and, long long, long_long);
+DECLARE_REDFUNC(or, long long, long_long);
+DECLARE_REDFUNC(xor, long long, long_long);
+DECLARE_REDFUNC(logical_and, long long, long_long);
+DECLARE_REDFUNC(logical_or, long long, long_long);
+DECLARE_REDFUNC(max, long long, long_long);
+DECLARE_REDFUNC(min, long long, long_long);
+
+DECLARE_REDFUNC_SIMPLE(sum, float);
+DECLARE_REDFUNC_SIMPLE(sub, float);
+DECLARE_REDFUNC_SIMPLE(prod, float);
+DECLARE_REDFUNC_SIMPLE(max, float);
+DECLARE_REDFUNC_SIMPLE(min, float);
+
+DECLARE_REDFUNC_SIMPLE(sum, double);
+DECLARE_REDFUNC_SIMPLE(sub, double);
+DECLARE_REDFUNC_SIMPLE(prod, double);
+DECLARE_REDFUNC_SIMPLE(max, double);
+DECLARE_REDFUNC_SIMPLE(min, double);
+
+// =================== End Declarations for reduction funcs ===============
 
 typedef struct {
     void *array;                         /* array, on which reduction will be performed */
@@ -109,286 +176,151 @@ void reduce_common(
     free(thread_args);
 }
 
-/* functions for SUM (+) reduction */
-void reduce_sum_int_func(void *a, void *b) {
-    *((int *)a) += *((int *)b);
+
+// =================== Definitions for reduction funcs ===================
+
+#define BODY_sum(type) *((type *)a) += *((type *)b);
+#define BODY_sub(type) *((type *)a) -= *((type *)b);
+#define BODY_prod(type) *((type *)a) *= *((type *)b);
+#define BODY_and(type) *((type *)a) &= *((type *)b);
+#define BODY_or(type) *((type *)a) |= *((type *)b);
+#define BODY_xor(type) *((type *)a) ^= *((type *)b);
+#define BODY_logical_and(type) *((type *)a) = *((type *)b) && *((type *)a);
+#define BODY_logical_or(type) *((type *)a) = *((type *)b) || *((type *)a);
+#define BODY_max(type) if (*((type *)a) < *((type *)b)) *((type *)a) = *((type *)b);
+#define BODY_min(type) if (*((type *)a) > *((type *)b)) *((type *)a) = *((type *)b);
+
+#define DEF_HOST(func, type, type_str) \
+void reduce_##func##_##type_str##_func(void *a, void *b) { BODY_##func(type) }
+
+// Use in case when type and it's string representation are the same (for example, int, float)
+#define DEF_HOST_SIMPLE(func, type) DEF_HOST(func, type, type)
+
+DEF_HOST_SIMPLE(sum, char);
+DEF_HOST_SIMPLE(sub, char);
+DEF_HOST_SIMPLE(prod, char);
+DEF_HOST_SIMPLE(and, char);
+DEF_HOST_SIMPLE(or, char);
+DEF_HOST_SIMPLE(xor, char);
+DEF_HOST_SIMPLE(logical_and, char);
+DEF_HOST_SIMPLE(logical_or, char);
+DEF_HOST_SIMPLE(max, char);
+DEF_HOST_SIMPLE(min, char);
+
+DEF_HOST_SIMPLE(sum, int);
+DEF_HOST_SIMPLE(sub, int);
+DEF_HOST_SIMPLE(prod, int);
+DEF_HOST_SIMPLE(and, int);
+DEF_HOST_SIMPLE(or, int);
+DEF_HOST_SIMPLE(xor, int);
+DEF_HOST_SIMPLE(logical_and, int);
+DEF_HOST_SIMPLE(logical_or, int);
+DEF_HOST_SIMPLE(max, int);
+DEF_HOST_SIMPLE(min, int);
+
+DEF_HOST_SIMPLE(sum, long);
+DEF_HOST_SIMPLE(sub, long);
+DEF_HOST_SIMPLE(prod, long);
+DEF_HOST_SIMPLE(and, long);
+DEF_HOST_SIMPLE(or, long);
+DEF_HOST_SIMPLE(xor, long);
+DEF_HOST_SIMPLE(logical_and, long);
+DEF_HOST_SIMPLE(logical_or, long);
+DEF_HOST_SIMPLE(max, long);
+DEF_HOST_SIMPLE(min, long);
+
+DEF_HOST(sum, long long, long_long);
+DEF_HOST(sub, long long, long_long);
+DEF_HOST(prod, long long, long_long);
+DEF_HOST(and, long long, long_long);
+DEF_HOST(or, long long, long_long);
+DEF_HOST(xor, long long, long_long);
+DEF_HOST(logical_and, long long, long_long);
+DEF_HOST(logical_or, long long, long_long);
+DEF_HOST(max, long long, long_long);
+DEF_HOST(min, long long, long_long);
+
+DEF_HOST_SIMPLE(sum, float);
+DEF_HOST_SIMPLE(sub, float);
+DEF_HOST_SIMPLE(prod, float);
+DEF_HOST_SIMPLE(max, float);
+DEF_HOST_SIMPLE(min, float);
+
+DEF_HOST_SIMPLE(sum, double);
+DEF_HOST_SIMPLE(sub, double);
+DEF_HOST_SIMPLE(prod, double);
+DEF_HOST_SIMPLE(max, double);
+DEF_HOST_SIMPLE(min, double);
+
+
+#define DEFINE_REDFUNC(func, type, type_str, default_value) DECLARE_REDFUNC(func, type, type_str) { \
+    type default_reduction_value = default_value; \
+    reduce_common(reduction_context, array, num_elems, sizeof(type), \
+                  &default_reduction_value, reduce_##func##_##type_str##_func, result); \
 }
 
-void reduce_sum_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = 0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_sum_int_func, result);
-}
+// Use in case when type and it's string representation are the same (for example, int, float)
+#define DEFINE_REDFUNC_SIMPLE(func, type, default_value) DEFINE_REDFUNC(func, type, type, default_value)
 
-void reduce_sum_long_long_int_func(void *a, void *b) {
-    *((long long int *)a) += *((long long int *)b);
-}
+DEFINE_REDFUNC_SIMPLE(sum, char, 0);
+DEFINE_REDFUNC_SIMPLE(sub, char, 0);
+DEFINE_REDFUNC_SIMPLE(prod, char, 1);
+DEFINE_REDFUNC_SIMPLE(and, char, ~(char)0);
+DEFINE_REDFUNC_SIMPLE(or, char, 0);
+DEFINE_REDFUNC_SIMPLE(xor, char, 0);
+DEFINE_REDFUNC_SIMPLE(logical_and, char, 1);
+DEFINE_REDFUNC_SIMPLE(logical_or, char, 0);
+DEFINE_REDFUNC_SIMPLE(max, char, CHAR_MIN);
+DEFINE_REDFUNC_SIMPLE(min, char, CHAR_MAX);
 
-void reduce_sum_long_long_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    long long int default_reduction_value = 0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_sum_long_long_int_func, result);
-}
+DEFINE_REDFUNC_SIMPLE(sum, int, 0);
+DEFINE_REDFUNC_SIMPLE(sub, int, 0);
+DEFINE_REDFUNC_SIMPLE(prod, int, 1);
+DEFINE_REDFUNC_SIMPLE(and, int, ~(int)0);
+DEFINE_REDFUNC_SIMPLE(or, int, 0);
+DEFINE_REDFUNC_SIMPLE(xor, int, 0);
+DEFINE_REDFUNC_SIMPLE(logical_and, int, 1);
+DEFINE_REDFUNC_SIMPLE(logical_or, int, 0);
+DEFINE_REDFUNC_SIMPLE(max, int, INT_MIN);
+DEFINE_REDFUNC_SIMPLE(min, int, INT_MAX);
 
-void reduce_sum_float_func(void *a, void *b) {
-    *((float *)a) += *((float *)b);
-}
+DEFINE_REDFUNC_SIMPLE(sum, long, 0);
+DEFINE_REDFUNC_SIMPLE(sub, long, 0);
+DEFINE_REDFUNC_SIMPLE(prod, long, 1);
+DEFINE_REDFUNC_SIMPLE(and, long, ~(long)0);
+DEFINE_REDFUNC_SIMPLE(or, long, 0);
+DEFINE_REDFUNC_SIMPLE(xor, long, 0);
+DEFINE_REDFUNC_SIMPLE(logical_and, long, 1);
+DEFINE_REDFUNC_SIMPLE(logical_or, long, 0);
+DEFINE_REDFUNC_SIMPLE(max, long, LONG_MIN);
+DEFINE_REDFUNC_SIMPLE(min, long, LONG_MAX);
 
-void reduce_sum_float(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    float default_reduction_value = 0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_sum_float_func, result);
-}
+DEFINE_REDFUNC(sum, long long, long_long, 0);
+DEFINE_REDFUNC(sub, long long, long_long, 0);
+DEFINE_REDFUNC(prod, long long, long_long, 1);
+DEFINE_REDFUNC(and, long long, long_long, ~(long long)0);
+DEFINE_REDFUNC(or, long long, long_long, 0);
+DEFINE_REDFUNC(xor, long long, long_long, 0);
+DEFINE_REDFUNC(logical_and, long long, long_long, 0);
+DEFINE_REDFUNC(logical_or, long long, long_long, 0);
+DEFINE_REDFUNC(max, long long, long_long, LLONG_MIN);
+DEFINE_REDFUNC(min, long long, long_long, LLONG_MAX);
 
-void reduce_sum_double_func(void *a, void *b) {
-    *((double *)a) += *((double *)b);
-}
+DEFINE_REDFUNC_SIMPLE(sum, float, 0);
+DEFINE_REDFUNC_SIMPLE(sub, float, 0);
+DEFINE_REDFUNC_SIMPLE(prod, float, 1);
+DEFINE_REDFUNC_SIMPLE(max, float, FLT_MIN);
+DEFINE_REDFUNC_SIMPLE(min, float, FLT_MAX);
 
-void reduce_sum_double(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    double default_reduction_value = 0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_sum_double_func, result);
-}
+DEFINE_REDFUNC_SIMPLE(sum, double, 0);
+DEFINE_REDFUNC_SIMPLE(sub, double, 0);
+DEFINE_REDFUNC_SIMPLE(prod, double, 1);
+DEFINE_REDFUNC_SIMPLE(max, double, DBL_MIN);
+DEFINE_REDFUNC_SIMPLE(min, double, DBL_MAX);
 
-
-/* functions for MULT (*) reduction */
-void reduce_mult_int_func(void *a, void *b) {
-    *((int *)a) *= *((int *)b);
-}
-
-void reduce_mult_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = 1;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_mult_int_func, result);
-}
-
-void reduce_mult_long_long_int_func(void *a, void *b) {
-    *((long long int *)a) *= *((long long int *)b);
-}
-
-void reduce_mult_long_long_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    long long int default_reduction_value = 1;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_mult_long_long_int_func, result);
-}
-
-void reduce_mult_float_func(void *a, void *b) {
-    *((float *)a) *= *((float *)b);
-}
-
-void reduce_mult_float(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    float default_reduction_value = 1;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_mult_float_func, result);
-}
-
-void reduce_mult_double_func(void *a, void *b) {
-    *((double *)a) *= *((double *)b);
-}
-
-void reduce_mult_double(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    double default_reduction_value = 1;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_mult_double_func, result);
-}
-
-/* functions for SUB (-) reduction */
-void reduce_sub_int_func(void *a, void *b) {
-    *((int *)a) -= *((int *)b);
-}
-
-void reduce_sub_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = 0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_sub_int_func, result);
-}
-
-/* functions for AND (&) reduction */
-void reduce_and_int_func(void *a, void *b) {
-    *((int *)a) &= *((int *)b);
-}
-
-void reduce_and_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = ~0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_and_int_func, result);
-}
+// =================== End Definitions for reduction funcs ===============
 
 
-/* functions for OR (|) reduction */
-void reduce_or_int_func(void *a, void *b) {
-    *((int *)a) |= *((int *)b);
-}
-
-void reduce_or_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = 0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_or_int_func, result);
-}
-
-
-/* functions for XOR (^) reduction */
-void reduce_xor_int_func(void *a, void *b) {
-    *((int *)a) ^= *((int *)b);
-}
-
-void reduce_xor_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = 0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_xor_int_func, result);
-}
-
-
-/* functions for logical AND (&&) reduction */
-void reduce_logical_and_int_func(void *out, void *in) {
-    *((int *)out) = *((int *)in) && *((int *)out);
-}
-
-void reduce_logical_and_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = 1;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_logical_and_int_func, result);
-}
-
-
-/* functions for logical OR (||) reduction */
-void reduce_logical_or_int_func(void *out, void *in) {
-    *((int *)out) = *((int *)in) || *((int *)out);
-}
-
-void reduce_logical_or_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = 0;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_logical_or_int_func, result);
-}
-
-
-/* functions for MAX reduction */
-void reduce_max_int_func(void *out, void *in) {
-    int out_val = *((int *)out);
-    int in_val = *((int *)in);
-    *((int *)out) = in_val > out_val ? in_val : out_val;
-}
-
-void reduce_max_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = INT_MIN;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_max_int_func, result);
-}
-
-
-/* functions for MIN reduction */
-void reduce_min_int_func(void *out, void *in) {
-    int out_val = *((int *)out);
-    int in_val = *((int *)in);
-    *((int *)out) = in_val < out_val ? out_val : in_val;
-}
-
-void reduce_min_int(
-    reduction_context_t *reduction_context,
-    void *array,
-    size_t num_elems,
-    size_t elem_size,
-    void *result
-) {
-    int default_reduction_value = INT_MAX;
-    reduce_common(reduction_context, array, num_elems, elem_size,
-                  &default_reduction_value, reduce_min_int_func, result);
-}
-
-
-// TODO: all functions above should be moved to other files inside argobots
-// TODO: some of the functions don't have versions for different types yet
 int main(int argc, char **argv)
 {
     int i;
@@ -463,7 +395,6 @@ int main(int argc, char **argv)
         &reduction_context,
         array,
         NUM_ELEMS,
-        elem_size,
         &result
     );
 
