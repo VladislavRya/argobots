@@ -2,6 +2,8 @@
 
 #include <abt.h>
 
+#define USE_TREE_REDUCTION 1
+
 typedef struct {
     ABT_xstream *xstreams;
     int num_xstreams;
